@@ -21,6 +21,13 @@
 
       setupOpts = {
 
+        signature = {
+          enabled = true;
+          trigger = {
+            enabled = true;
+          };
+        };
+
         sources = {
           default = [
             "lsp"
