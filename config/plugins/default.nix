@@ -2,6 +2,7 @@
 {
   imports = [
     ./alpha.nix
+    ./conform.nix
     ./debugger.nix
     ./fzf.nix
     ./filetree.nix
