@@ -90,6 +90,7 @@ in
       enableFormat = true;
       enableTreesitter = true;
       enableExtraDiagnostics = true;
-    } // treeSitterEnables;
+    }
+    // treeSitterEnables;
   };
 }

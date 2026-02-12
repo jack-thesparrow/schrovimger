@@ -7,6 +7,7 @@
     ./options.nix
     ./keymaps.nix
     ./luaLoader.nix
+    ./luaConfigRC.nix
     ./session.nix
     ./whichKey.nix
   ];
