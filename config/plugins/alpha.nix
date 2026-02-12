@@ -1486,7 +1486,7 @@
 
       dashboard.section.buttons.val = {
         dashboard.button("n", "  New file", ":ene | startinsert<CR>"),
-        dashboard.button("f", "  Find file", ":Telescope find_files<CR>"),
+        dashboard.button("f", "󰍉  Find file", ":Telescope find_files<CR>"),
         dashboard.button("g", "  Live grep", ":Telescope live_grep<CR>"),
         dashboard.button("r", "  Recent files", ":Telescope oldfiles<CR>"),
         dashboard.button("m", "  Bookmarks", ":Telescope marks<CR>"),

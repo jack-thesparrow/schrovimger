@@ -1,5 +1,7 @@
 {
   vim = {
+    lsp.servers.nixd.enable = true;
+
     languages = {
       enableFormat = true;
       enableDAP = true;
@@ -17,12 +19,14 @@
         cHeader = true;
         dap.enable = true;
         lsp.enable = true;
+        #treesitter.enable = true;
+
       };
 
-      html = {
-        enable = true;
-        treesitter.autotagHtml = true;
-      };
+      #      html = {
+      #        enable = true;
+      #        treesitter.autotagHtml = true;
+      #      };
 
       java = {
         enable = true;
@@ -39,17 +43,17 @@
       nix = {
         enable = true;
         format.enable = true;
-        format.type = "nixfmt";
+        format.type = [ "nixfmt" ];
         #format.package = pkgs.nixfmt-rfc-style;
-        lsp = {
-          enable = true;
-          server = "nixd";
-          options = {
-            nixpkgs = {
-              expr = "import <nixpkgs> { }";
-            };
-          };
-        };
+        #lsp = {
+        #  enable = true;
+        #  servers = [ "nixd" ];
+        #  options = {
+        #    nixpkgs = {
+        #      expr = "import <nixpkgs> { }";
+        #    };
+        #  };
+        #};
         extraDiagnostics = {
           enable = true;
           types = [
@@ -71,18 +75,23 @@
 
       python = {
         enable = true;
-        format.type = "black";
+        format.type = [ "black" ];
 
       };
 
       rust = {
         enable = true;
-        crates = {
-          enable = true;
-          codeActions = true;
+        extensions = {
+          crates-nvim = {
+            enable = true;
+            setupOpts = {
+              codeActions = true;
+            };
+          };
+
         };
         format.enable = true;
-        format.type = "rustfmt";
+        format.type = [ "rustfmt" ];
         lsp = {
           enable = true;
           opts = "

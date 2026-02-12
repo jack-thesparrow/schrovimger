@@ -1,9 +1,8 @@
-{ ... }:
 {
   vim.minimap = {
-    #enable = true;
+    minimap-vim.enable = false;
     codewindow = {
-      enable = true;
+      enable = false;
       mappings = {
         open = "<leader>mo";
         close = "<leader>mc";
