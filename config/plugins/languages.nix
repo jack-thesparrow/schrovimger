@@ -40,29 +40,28 @@
         lsp.enable = true;
       };
 
-      # Deprecated code
-      #      nix = {
-      #        enable = true;
-      #        format.enable = true;
-      #        format.type = "nixfmt";
-      #        #format.package = pkgs.nixfmt-rfc-style;
-      #        lsp = {
-      #          enable = true;
-      #          servers = [ "nixd" ];
-      #          options = {
-      #            nixpkgs = {
-      #              expr = "import <nixpkgs> { }";
-      #            };
-      #          };
-      #        };
-      #        extraDiagnostics = {
-      #          enable = true;
-      #          types = [
-      #            "statix"
-      #            "deadnix"
-      #          ];
-      #        };
-      #      };
+      nix = {
+        enable = true;
+        format.enable = true;
+        format.type = [ "nixfmt" ];
+        #format.package = pkgs.nixfmt-rfc-style;
+        #lsp = {
+        #  enable = true;
+        #  servers = [ "nixd" ];
+        #  options = {
+        #    nixpkgs = {
+        #      expr = "import <nixpkgs> { }";
+        #    };
+        #  };
+        #};
+        extraDiagnostics = {
+          enable = true;
+          types = [
+            "statix"
+            "deadnix"
+          ];
+        };
+      };
 
       markdown = {
         enable = true;

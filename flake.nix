@@ -65,13 +65,13 @@
               pkgs.runCommand "format-check"
                 {
                   nativeBuildInputs = [
-                    pkgs.nixfmt-rfc-style
+                    pkgs.nixfmt
                     pkgs.diffutils
                     pkgs.rsync
                   ];
                 }
                 ''
-                  echo "📏 Running nixfmt-rfc-style check..."
+                  echo "📏 Running nixfmt check..."
 
                   mkdir $TMPDIR/orig
                   mkdir $TMPDIR/formatted
@@ -111,7 +111,7 @@
                 '';
           };
 
-          formatter = pkgs.nixfmt-rfc-style;
+          formatter = pkgs.nixfmt;
 
           devShells.default = pkgs.mkShell {
             packages =
@@ -125,7 +125,7 @@
                 imagemagick
                 pre-commit
                 poppler-utils
-                nixfmt-rfc-style
+                nixfmt
                 nixd
                 nerd-fonts.jetbrains-mono
                 ripgrep
@@ -150,7 +150,7 @@
               pkgs.imagemagick
               pkgs.pre-commit
               pkgs.poppler-utils
-              pkgs.nixfmt-rfc-style
+              pkgs.nixfmt
               pkgs.nixd
               pkgs.nerd-fonts.jetbrains-mono
               pkgs.ripgrep
