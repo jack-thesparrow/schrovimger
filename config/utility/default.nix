@@ -1,5 +1,6 @@
 {
   imports = [
+    ./diagnostics.nix
     ./flash-nvim.nix
     ./image-nvim.nix
     ./leetcode-nvim.nix
