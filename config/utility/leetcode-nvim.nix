@@ -1,12 +1,12 @@
 {
   vim.utility.leetcode-nvim = {
-    enable = true;
+    enable = false;
     setupOpts = {
       image_support = true;
       lang = "cpp";
       logging = true;
       plugins = {
-        non_standalone = false;
+        non_standalone = true;
       };
     };
   };
