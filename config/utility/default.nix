@@ -6,6 +6,7 @@
     ./leetcode-nvim.nix
     ./mutlicursors.nix
     ./outline.nix
+    ./oil-nvim.nix
     ./precognition.nix
     ./preview.nix
     ./smart-splits.nix
