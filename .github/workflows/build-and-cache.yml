@@ -80,6 +80,15 @@ jobs:
             system: aarch64-darwin
             runner: macos-latest
 
+          - profile: full
+            system: aarch64-darwin
+            runner: macos-latest
+
+          - profile: full
+            system: aarch64-darwin
+            runner: macos-latest
+            container: ""
+
     steps:
 
       # --------------------------------------------------------
@@ -93,7 +102,16 @@ jobs:
       # Nix
       # --------------------------------------------------------
 
-      - name: 🧊 Install Nix
+      # --------------------------------------------------------
+      # Nix
+      # --------------------------------------------------------
+
+      # ─────────────────────────────────────────────────────────
+      # Nix
+      # ─────────────────────────────────────────────────────────
+
+      - name: 🧊 Install Nix (macOS only — Linux legs already have it via container)
+        if: matrix.container == ''
         uses: DeterminateSystems/nix-installer-action@main
         with:
           extra-conf: |
