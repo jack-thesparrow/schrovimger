@@ -1,143 +1,96 @@
-# 🧪 CI: Runs checks & build for every pull request
+# 🚀 Build & Cache: Runs on push to main, builds profiles for supported
+# systems and pushes closures to Cachix.
 
-name: 🧪 CI
+name: 🚀 Build & Cache
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  changes:
-    name: 🔎 Detect affected profiles
-    runs-on: ubuntu-latest
-    outputs:
-      minimal: ${{ steps.filter.outputs.minimal }}
-      cpp: ${{ steps.filter.outputs.cpp }}
-      rust: ${{ steps.filter.outputs.rust }}
-      python: ${{ steps.filter.outputs.python }}
-      java: ${{ steps.filter.outputs.java }}
-      full: ${{ steps.filter.outputs.full }}
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v5
-
-      - name: 🔎 Filter changed paths
-        uses: dorny/paths-filter@v4
-        id: filter
-        with:
-          filters: |
-            common: &common
-              - 'config/core/**'
-              - 'config/plugins/**'
-              - 'config/themes/**'
-              - 'config/ui/**'
-              - 'config/utility/**'
-              - 'config/languages/_base.nix'
-              - 'config/profiles/minimal.nix'
-              - 'config/default.nix'
-              - 'flake.nix'
-              - 'flake.lock'
-            minimal: *common
-            cpp:
-              - *common
-              - 'config/languages/clang.nix'
-              - 'config/languages/cmake.nix'
-              - 'config/profiles/cpp.nix'
-            rust:
-              - *common
-              - 'config/languages/rust.nix'
-              - 'config/profiles/rust.nix'
-            python:
-              - *common
-              - 'config/languages/python.nix'
-              - 'config/profiles/python.nix'
-            java:
-              - *common
-              - 'config/languages/java.nix'
-              - 'config/profiles/java.nix'
-            full:
-              - *common
-              - 'config/languages/**'
-              - 'config/profiles/full.nix'
-
-  static-checks:
-    name: ✅ Format / deadnix / statix
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v5
-
-      - name: 🧊 Install Nix
-        uses: cachix/install-nix-action@v25
-        with:
-          nix_path: nixpkgs=channel:nixpkgs-unstable
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: 📦 Setup Cachix
-        uses: cachix/cachix-action@v16
-        with:
-          name: schrovimger
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: 🔍 Run static checks (current system only)
-        run: |
-          nix build \
-            .#checks.x86_64-linux.format-check \
-            .#checks.x86_64-linux.deadnix \
-            .#checks.x86_64-linux.statix \
-            --no-link --print-out-paths
-
-  build-profiles:
-    name: 🔨 Build (${{ matrix.profile }})
-    needs: changes
-    runs-on: ubuntu-latest
+  build-and-cache:
+    name: 📦 ${{ matrix.profile }} (${{ matrix.system }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        profile: [minimal, cpp, rust, python, java, full]
+        include:
+          # x86_64-linux: every profile.
+          - profile: minimal
+            system: x86_64-linux
+            runner: ubuntu-latest
+          - profile: cpp
+            system: x86_64-linux
+            runner: ubuntu-latest
+          - profile: rust
+            system: x86_64-linux
+            runner: ubuntu-latest
+          - profile: python
+            system: x86_64-linux
+            runner: ubuntu-latest
+          - profile: java
+            system: x86_64-linux
+            runner: ubuntu-latest
+          - profile: full
+            system: x86_64-linux
+            runner: ubuntu-latest
+
+          # aarch64-linux: smoke-test with minimal + full only.
+          - profile: minimal
+            system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - profile: full
+            system: aarch64-linux
+            runner: ubuntu-24.04-arm
+
+          # aarch64-darwin: smoke-test with minimal + full only.
+          - profile: minimal
+            system: aarch64-darwin
+            runner: macos-latest
+          - profile: full
+            system: aarch64-darwin
+            runner: macos-latest
+
     steps:
-      - name: 📥 Checkout
+      - name: 📥 Checkout repository
         uses: actions/checkout@v5
 
       - name: 🧊 Install Nix
-        if: needs.changes.outputs[matrix.profile] == 'true'
-        uses: cachix/install-nix-action@v25
+        uses: DeterminateSystems/nix-installer-action@main
         with:
-          nix_path: nixpkgs=channel:nixpkgs-unstable
-          extra_nix_config: |
+          extra-conf: |
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
-        if: needs.changes.outputs[matrix.profile] == 'true'
         uses: cachix/cachix-action@v16
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: 🔨 Build ${{ matrix.profile }}
-        if: needs.changes.outputs[matrix.profile] == 'true'
+      - name: 🔨 Build ${{ matrix.profile }} (${{ matrix.system }})
         run: nix build .#${{ matrix.profile }} --print-out-paths
 
-      - name: ⏭️ Skipped
-        if: needs.changes.outputs[matrix.profile] != 'true'
-        run: echo "No changes affecting the ${{ matrix.profile }} profile — skipping build."
+      - name: 🚀 Push to Cachix
+        run: |
+          nix path-info --recursive .#${{ matrix.profile }} | cachix push schrovimger
 
-  devshell:
-    name: 🧑‍💻 Dev shell
+  flake-check-all-systems:
+    name: 🔍 Full flake check (all systems)
     runs-on: ubuntu-latest
+    needs: build-and-cache
     steps:
-      - name: 📥 Checkout
+      - name: 📥 Checkout repository
         uses: actions/checkout@v5
 
       - name: 🧊 Install Nix
-        uses: cachix/install-nix-action@v25
+        uses: DeterminateSystems/nix-installer-action@main
         with:
-          nix_path: nixpkgs=channel:nixpkgs-unstable
-          extra_nix_config: |
+          extra-conf: |
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
@@ -146,5 +99,5 @@ jobs:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: 🧑‍💻 Test dev shell
-        run: nix develop --command echo "Dev shell works!"
+      - name: 🔍 Run flake checks (all systems)
+        run: nix flake check --all-systems --no-update-lock-file
