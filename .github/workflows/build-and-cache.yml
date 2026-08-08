@@ -1,15 +1,3 @@
-# 🚀 Build & Cache
-#
-# Builds SchroVimger profiles for supported systems and pushes
-# the resulting Nix closures to Cachix.
-#
-# Linux:
-#   - x86_64-linux: all profiles
-#   - aarch64-linux: minimal + full smoke tests
-#
-# macOS:
-#   - aarch64-darwin: minimal + full smoke tests
-
 name: 🚀 Build & Cache
 
 on:
@@ -25,9 +13,11 @@ env:
   NIX_CONFIG: "experimental-features = nix-command flakes"
 
 jobs:
-  # ─────────────────────────────────────────────────────────────
+
+  # ============================================================
   # Build profiles
-  # ─────────────────────────────────────────────────────────────
+  # ============================================================
+
   build-and-cache:
     name: 📦 ${{ matrix.profile }} (${{ matrix.system }})
     runs-on: ${{ matrix.runner }}
@@ -37,10 +27,10 @@ jobs:
 
       matrix:
         include:
-          # ─────────────────────────────────────────────────────
+
+          # ----------------------------------------------------
           # x86_64-linux
-          # Build every profile
-          # ─────────────────────────────────────────────────────
+          # ----------------------------------------------------
 
           - profile: minimal
             system: x86_64-linux
@@ -66,10 +56,9 @@ jobs:
             system: x86_64-linux
             runner: ubuntu-latest
 
-          # ─────────────────────────────────────────────────────
+          # ----------------------------------------------------
           # aarch64-linux
-          # Smoke test only
-          # ─────────────────────────────────────────────────────
+          # ----------------------------------------------------
 
           - profile: minimal
             system: aarch64-linux
@@ -79,12 +68,15 @@ jobs:
             system: aarch64-linux
             runner: ubuntu-24.04-arm
 
-          # ─────────────────────────────────────────────────────
+          # ----------------------------------------------------
           # aarch64-darwin
-          # Smoke test only
-          # ─────────────────────────────────────────────────────
+          # ----------------------------------------------------
 
           - profile: minimal
+            system: aarch64-darwin
+            runner: macos-latest
+
+          - profile: full
             system: aarch64-darwin
             runner: macos-latest
 
@@ -94,12 +86,17 @@ jobs:
             container: ""
 
     steps:
-      # ─────────────────────────────────────────────────────────
+
+      # --------------------------------------------------------
       # Checkout
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
 
       - name: 📥 Checkout repository
         uses: actions/checkout@v5
+
+      # --------------------------------------------------------
+      # Nix
+      # --------------------------------------------------------
 
       # ─────────────────────────────────────────────────────────
       # Nix
@@ -112,9 +109,9 @@ jobs:
           extra-conf: |
             experimental-features = nix-command flakes
 
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
       # Cachix
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
 
       - name: 📦 Setup Cachix
         uses: cachix/cachix-action@v16
@@ -122,9 +119,9 @@ jobs:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
       # Build
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
 
       - name: 🔨 Build ${{ matrix.profile }}
         run: |
@@ -133,9 +130,9 @@ jobs:
             --print-out-paths \
             --no-update-lock-file
 
-      # ─────────────────────────────────────────────────────────
-      # Push complete closure to Cachix
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
+      # Push closure
+      # --------------------------------------------------------
 
       - name: 🚀 Push to Cachix
         run: |
@@ -145,28 +142,41 @@ jobs:
             | cachix push schrovimger
 
 
-  # ─────────────────────────────────────────────────────────────
-  # Validate the complete flake
-  #
-  # Runs independently so it doesn't have to wait for every
-  # profile/architecture build.
-  # ─────────────────────────────────────────────────────────────
+  # ============================================================
+  # Flake checks
+  # ============================================================
 
-  flake-check-all-systems:
-    name: 🔍 Full flake check (all systems)
-    runs-on: ubuntu-latest
+  flake-check:
+    name: 🔍 Flake check (${{ matrix.system }})
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+
+          - system: x86_64-linux
+            runner: ubuntu-latest
+
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+
+          - system: aarch64-darwin
+            runner: macos-latest
 
     steps:
-      # ─────────────────────────────────────────────────────────
+
+      # --------------------------------------------------------
       # Checkout
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
 
       - name: 📥 Checkout repository
         uses: actions/checkout@v5
 
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
       # Nix
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
 
       - name: 🧊 Install Nix
         uses: DeterminateSystems/nix-installer-action@main
@@ -174,12 +184,12 @@ jobs:
           extra-conf: |
             experimental-features = nix-command flakes
 
-      # ─────────────────────────────────────────────────────────
-      # Check
-      # ─────────────────────────────────────────────────────────
+      # --------------------------------------------------------
+      # Check only this machine's system
+      # --------------------------------------------------------
 
       - name: 🔍 Run flake checks
         run: |
           nix flake check \
-            --all-systems \
+            --system ${{ matrix.system }} \
             --no-update-lock-file
