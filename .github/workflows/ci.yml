@@ -10,6 +10,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: 🔎 Detect affected profiles
+    runs-on: ubuntu-latest
+    outputs:
+      minimal: ${{ steps.filter.outputs.minimal }}
+      cpp: ${{ steps.filter.outputs.cpp }}
+      rust: ${{ steps.filter.outputs.rust }}
+      python: ${{ steps.filter.outputs.python }}
+      java: ${{ steps.filter.outputs.java }}
+      full: ${{ steps.filter.outputs.full }}
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔎 Filter changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            common: &common
+              - 'config/core/**'
+              - 'config/plugins/**'
+              - 'config/themes/**'
+              - 'config/ui/**'
+              - 'config/utility/**'
+              - 'config/languages/_base.nix'
+              - 'config/profiles/minimal.nix'
+              - 'config/default.nix'
+              - 'flake.nix'
+              - 'flake.lock'
+            minimal: *common
+            cpp:
+              - *common
+              - 'config/languages/clang.nix'
+              - 'config/languages/cmake.nix'
+              - 'config/profiles/cpp.nix'
+            rust:
+              - *common
+              - 'config/languages/rust.nix'
+              - 'config/profiles/rust.nix'
+            python:
+              - *common
+              - 'config/languages/python.nix'
+              - 'config/profiles/python.nix'
+            java:
+              - *common
+              - 'config/languages/java.nix'
+              - 'config/profiles/java.nix'
+            full:
+              - *common
+              - 'config/languages/**'
+              - 'config/profiles/full.nix'
+
   static-checks:
     name: ✅ Format / deadnix / statix
     runs-on: ubuntu-latest
@@ -40,6 +93,7 @@ jobs:
 
   build-profiles:
     name: 🔨 Build (${{ matrix.profile }})
+    needs: changes
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -50,6 +104,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🧊 Install Nix
+        if: needs.changes.outputs[matrix.profile] == 'true'
         uses: cachix/install-nix-action@v25
         with:
           nix_path: nixpkgs=channel:nixpkgs-unstable
@@ -57,13 +112,19 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
+        if: needs.changes.outputs[matrix.profile] == 'true'
         uses: cachix/cachix-action@v14
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: 🔨 Build ${{ matrix.profile }} (x86_64-linux)
+      - name: 🔨 Build ${{ matrix.profile }}
+        if: needs.changes.outputs[matrix.profile] == 'true'
         run: nix build .#${{ matrix.profile }} --print-out-paths
+
+      - name: ⏭️ Skipped
+        if: needs.changes.outputs[matrix.profile] != 'true'
+        run: echo "No changes affecting the ${{ matrix.profile }} profile — skipping build."
 
   devshell:
     name: 🧑‍💻 Dev shell
