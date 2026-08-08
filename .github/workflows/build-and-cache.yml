@@ -108,6 +108,12 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v5
 
+      - name: 🧊 Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+
       - name: 📦 Setup Cachix
         uses: cachix/cachix-action@v16
         with:
