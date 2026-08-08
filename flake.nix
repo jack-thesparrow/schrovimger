@@ -4,7 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-unstable";
-
     flake-parts.url = "github:hercules-ci/flake-parts";
     nvf.url = "github:notashelf/nvf";
   };
@@ -29,6 +28,7 @@
         let
           pkgs = import nixpkgs {
             inherit system;
+
             overlays = [
               (_final: _prev: {
                 stable = import nixpkgs-stable {
@@ -38,6 +38,7 @@
                 };
               })
             ];
+
             config.allowUnfree = true;
           };
 
@@ -49,6 +50,7 @@
             java = ./config/profiles/java.nix;
             full = ./config/profiles/full.nix;
           };
+
           neovims = pkgs.lib.mapAttrs (
             _name: profileModule:
             (nvf.lib.neovimConfiguration {
@@ -56,44 +58,49 @@
               modules = [ profileModule ];
             }).neovim
           ) profiles;
+
           wrapProfile =
             name: drv:
-            pkgs.runCommand "nvim-${name}-wrapped" { } ''
+            pkgs.runCommand "nvim-${name}" { } ''
               mkdir -p $out/bin
               ln -s ${drv}/bin/nvim $out/bin/nvim-${name}
             '';
 
-          wrappedPackages = pkgs.lib.mapAttrs' (
-            name: drv: pkgs.lib.nameValuePair "nvim-${name}" (wrapProfile name drv)
+          cliPackages = pkgs.lib.mapAttrs' (
+            name: drv:
+            pkgs.lib.nameValuePair "nvim-${name}" (wrapProfile name drv)
           ) (pkgs.lib.filterAttrs (name: _: name != "minimal") neovims);
+
+          profilePackages =
+            neovims
+            // cliPackages;
 
         in
         {
-          _module.args.pkgs = pkgs;
-
           packages =
-            neovims
-            // wrappedPackages
+            profilePackages
             // {
               default = neovims.minimal;
             };
 
           apps =
-            (pkgs.lib.mapAttrs (name: drv: {
-              meta.description = "SchroVimger Neovim NVF Flake";
-              type = "app";
-              program = "${drv}/bin/nvim";
-            }) neovims)
+            pkgs.lib.mapAttrs (
+              name: drv:
+              {
+                type = "app";
+                program = "${drv}/bin/nvim";
+                meta.description = "SchroVimger ${name} profile";
+              }
+            ) neovims
             // {
               default = {
-                meta.description = "SchroVimger Neovim NVF Flake";
                 type = "app";
                 program = "${neovims.minimal}/bin/nvim";
+                meta.description = "SchroVimger minimal profile";
               };
             };
 
           checks = {
-            ## ✅ 1) Format check
             format-check =
               pkgs.runCommand "format-check"
                 {
@@ -104,43 +111,62 @@
                   ];
                 }
                 ''
-                  echo "📏 Running nixfmt check..."
+                  mkdir -p "$TMPDIR/orig"
+                  mkdir -p "$TMPDIR/formatted"
 
-                  mkdir $TMPDIR/orig
-                  mkdir $TMPDIR/formatted
+                  rsync -a \
+                    --exclude orig \
+                    --exclude formatted \
+                    --exclude .git \
+                    ./ "$TMPDIR/orig/"
 
-                  rsync -a --exclude orig --exclude formatted --exclude .git --exclude result ./ $TMPDIR/orig/
-                  rsync -a $TMPDIR/orig/ $TMPDIR/formatted/
+                  rsync -a \
+                    "$TMPDIR/orig/" \
+                    "$TMPDIR/formatted/"
 
-                  find $TMPDIR/formatted -name '*.nix' -exec nixfmt {} +
+                  find "$TMPDIR/formatted" \
+                    -name '*.nix' \
+                    -exec nixfmt {} +
 
-                  diff -ru $TMPDIR/orig $TMPDIR/formatted || (echo '❌ Formatting issues found'; exit 1)
+                  diff -ru \
+                    "$TMPDIR/orig" \
+                    "$TMPDIR/formatted" \
+                    || (
+                      echo "Formatting issues found"
+                      exit 1
+                    )
 
-                  touch $out
+                  touch "$out"
                 '';
 
-            ## ✅ 2) Deadnix check
             deadnix =
               pkgs.runCommand "deadnix-check"
                 {
                   nativeBuildInputs = [ pkgs.deadnix ];
                 }
                 ''
-                  echo "🧹 Running deadnix..."
-                  deadnix check . || (echo "❌ Dead code found"; exit 1)
-                  touch $out
+                  deadnix check . \
+                    || (
+                      echo "Dead code found"
+                      exit 1
+                    )
+
+                  touch "$out"
                 '';
 
-            ## ✅ 3) Statix check
             statix =
               pkgs.runCommand "statix-check"
                 {
                   nativeBuildInputs = [ pkgs.statix ];
                 }
                 ''
-                  echo "🕵️ Running statix..."
-                  statix check . || (echo "❌ Style issues found"; exit 1)
-                  touch $out
+                  statix check . \
+                    || (
+                      echo "Style issues found"
+                      exit 1
+                    )
+
+                  touch "$out"
                 '';
           };
 
@@ -165,13 +191,19 @@
                 deadnix
                 statix
               ]
-              ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.fontpreview ];
+              ++ lib.optionals stdenv.isLinux [
+                fontpreview
+              ];
           };
         };
 
       flake = {
         homeModules.default =
-          { pkgs, lib, ... }:
+          {
+            pkgs,
+            lib,
+            ...
+          }:
           let
             profiles = {
               minimal = ./config/profiles/minimal.nix;
@@ -181,6 +213,7 @@
               java = ./config/profiles/java.nix;
               full = ./config/profiles/full.nix;
             };
+
             neovims = lib.mapAttrs (
               _name: profileModule:
               (nvf.lib.neovimConfiguration {
@@ -191,36 +224,36 @@
 
             wrapProfile =
               name: drv:
-              pkgs.runCommand "nvim-${name}-wrapped" { } ''
+              pkgs.runCommand "nvim-${name}" { } ''
                 mkdir -p $out/bin
                 ln -s ${drv}/bin/nvim $out/bin/nvim-${name}
               '';
 
-            wrapped = lib.mapAttrsToList (name: drv: wrapProfile name drv) (
-              lib.filterAttrs (name: _: name != "minimal") neovims
-            );
+            cliPackages = lib.mapAttrsToList (
+              name: drv:
+              wrapProfile name drv
+            ) (lib.filterAttrs (name: _: name != "minimal") neovims);
 
           in
           {
-            home.packages = [
-              pkgs.chafa
-              pkgs.epub-thumbnailer
-              pkgs.fd
-              pkgs.fontpreview
-              pkgs.ffmpegthumbnailer
-              pkgs.git
-              pkgs.imagemagick
-              pkgs.pre-commit
-              pkgs.poppler-utils
-              pkgs.nixfmt
-              pkgs.nixd
-              pkgs.nerd-fonts.jetbrains-mono
-              pkgs.ripgrep
+            home.packages =
+              [
+                pkgs.chafa
+                pkgs.epub-thumbnailer
+                pkgs.fd
+                pkgs.ffmpegthumbnailer
+                pkgs.git
+                pkgs.imagemagick
+                pkgs.pre-commit
+                pkgs.poppler-utils
+                pkgs.nixfmt
+                pkgs.nixd
+                pkgs.nerd-fonts.jetbrains-mono
+                pkgs.ripgrep
 
-              neovims.minimal
-
-            ]
-            ++ wrapped;
+                neovims.minimal
+              ]
+              ++ cliPackages;
           };
       };
     };
