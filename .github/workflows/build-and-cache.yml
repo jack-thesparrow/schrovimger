@@ -1,89 +1,80 @@
-# 🚀 Build & Cache: Runs on push to main, builds profiles for supported
-# systems and pushes closures to Cachix. Linux legs run inside a
-# Nix-preinstalled container (no installer step); macOS still needs the
-# Determinate Systems installer since GitHub Actions containers aren't
-# supported on macOS runners.
+# 🧪 CI: Runs checks & build for every pull request
 
-name: 🚀 Build & Cache
+name: 🧪 CI
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NIX_CONFIG: "experimental-features = nix-command flakes"
-
 jobs:
-  build-and-cache:
-    name: 📦 ${{ matrix.profile }} (${{ matrix.system }})
-    runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.container || null }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # x86_64-linux: every profile, in a Nix-preinstalled container.
-          - profile: minimal
-            system: x86_64-linux
-            runner: ubuntu-latest
-            container: nixos/nix:latest
-          - profile: cpp
-            system: x86_64-linux
-            runner: ubuntu-latest
-            container: nixos/nix:latest
-          - profile: rust
-            system: x86_64-linux
-            runner: ubuntu-latest
-            container: nixos/nix:latest
-          - profile: python
-            system: x86_64-linux
-            runner: ubuntu-latest
-            container: nixos/nix:latest
-          - profile: java
-            system: x86_64-linux
-            runner: ubuntu-latest
-            container: nixos/nix:latest
-          - profile: full
-            system: x86_64-linux
-            runner: ubuntu-latest
-            container: nixos/nix:latest
-
-          # aarch64-linux: smoke-test with minimal + full only.
-          - profile: minimal
-            system: aarch64-linux
-            runner: ubuntu-24.04-arm
-            container: nixos/nix:latest
-          - profile: full
-            system: aarch64-linux
-            runner: ubuntu-24.04-arm
-            container: nixos/nix:latest
-
-          # aarch64-darwin: smoke-test with minimal + full only.
-          # No container support on macOS runners, so container is empty
-          # and the Determinate Systems installer step below runs instead.
-          - profile: minimal
-            system: aarch64-darwin
-            runner: macos-latest
-            container: ""
-          - profile: full
-            system: aarch64-darwin
-            runner: macos-latest
-            container: ""
-
+  changes:
+    name: 🔎 Detect affected profiles
+    runs-on: ubuntu-latest
+    outputs:
+      minimal: ${{ steps.filter.outputs.minimal }}
+      cpp: ${{ steps.filter.outputs.cpp }}
+      rust: ${{ steps.filter.outputs.rust }}
+      python: ${{ steps.filter.outputs.python }}
+      java: ${{ steps.filter.outputs.java }}
+      full: ${{ steps.filter.outputs.full }}
     steps:
-      - name: 📥 Checkout repository
+      - name: 📥 Checkout
         uses: actions/checkout@v5
 
-      - name: 🧊 Install Nix (macOS only — Linux legs already have it via container)
-        if: matrix.container == ''
-        uses: DeterminateSystems/nix-installer-action@main
+      - name: 🔎 Filter changed paths
+        uses: dorny/paths-filter@v4
+        id: filter
         with:
-          extra-conf: |
+          filters: |
+            common: &common
+              - 'config/core/**'
+              - 'config/plugins/**'
+              - 'config/themes/**'
+              - 'config/ui/**'
+              - 'config/utility/**'
+              - 'config/languages/_base.nix'
+              - 'config/profiles/minimal.nix'
+              - 'config/default.nix'
+              - 'flake.nix'
+              - 'flake.lock'
+            minimal: *common
+            cpp:
+              - *common
+              - 'config/languages/clang.nix'
+              - 'config/languages/cmake.nix'
+              - 'config/profiles/cpp.nix'
+            rust:
+              - *common
+              - 'config/languages/rust.nix'
+              - 'config/profiles/rust.nix'
+            python:
+              - *common
+              - 'config/languages/python.nix'
+              - 'config/profiles/python.nix'
+            java:
+              - *common
+              - 'config/languages/java.nix'
+              - 'config/profiles/java.nix'
+            full:
+              - *common
+              - 'config/languages/**'
+              - 'config/profiles/full.nix'
+
+  static-checks:
+    name: ✅ Format / deadnix / statix
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v5
+
+      - name: 🧊 Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+          extra_nix_config: |
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
@@ -92,21 +83,62 @@ jobs:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: 🔨 Build ${{ matrix.profile }} (${{ matrix.system }})
+      - name: 🔍 Run static checks (current system only)
+        run: |
+          nix build \
+            .#checks.x86_64-linux.format-check \
+            .#checks.x86_64-linux.deadnix \
+            .#checks.x86_64-linux.statix \
+            --no-link --print-out-paths
+
+  build-profiles:
+    name: 🔨 Build (${{ matrix.profile }})
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [minimal, cpp, rust, python, java, full]
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v5
+
+      - name: 🧊 Install Nix
+        if: needs.changes.outputs[matrix.profile] == 'true'
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: 📦 Setup Cachix
+        if: needs.changes.outputs[matrix.profile] == 'true'
+        uses: cachix/cachix-action@v16
+        with:
+          name: schrovimger
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: 🔨 Build ${{ matrix.profile }}
+        if: needs.changes.outputs[matrix.profile] == 'true'
         run: nix build .#${{ matrix.profile }} --print-out-paths
 
-      - name: 🚀 Push to Cachix
-        run: |
-          nix path-info --recursive .#${{ matrix.profile }} | cachix push schrovimger
+      - name: ⏭️ Skipped
+        if: needs.changes.outputs[matrix.profile] != 'true'
+        run: echo "No changes affecting the ${{ matrix.profile }} profile — skipping build."
 
-  flake-check-all-systems:
-    name: 🔍 Full flake check (all systems)
+  devshell:
+    name: 🧑‍💻 Dev shell
     runs-on: ubuntu-latest
-    container: nixos/nix:latest
-    needs: build-and-cache
     steps:
-      - name: 📥 Checkout repository
+      - name: 📥 Checkout
         uses: actions/checkout@v5
+
+      - name: 🧊 Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
         uses: cachix/cachix-action@v16
@@ -114,5 +146,5 @@ jobs:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: 🔍 Run flake checks (all systems)
-        run: nix flake check --all-systems --no-update-lock-file
+      - name: 🧑‍💻 Test dev shell
+        run: nix develop --command echo "Dev shell works!"
