@@ -83,6 +83,10 @@ jobs:
           - profile: full
             system: aarch64-darwin
             runner: macos-latest
+
+          - profile: full
+            system: aarch64-darwin
+            runner: macos-latest
             container: ""
 
     steps:
@@ -93,6 +97,10 @@ jobs:
 
       - name: 📥 Checkout repository
         uses: actions/checkout@v5
+
+      # --------------------------------------------------------
+      # Nix
+      # --------------------------------------------------------
 
       # --------------------------------------------------------
       # Nix
