@@ -4,7 +4,7 @@
     startPlugins = with pkgs.vimPlugins; [
       barbecue-nvim
       nvim-navic
-      nvim-web-devicons
+      #nvim-web-devicons
     ];
 
     pluginRC.barbecue-nvim = ''
