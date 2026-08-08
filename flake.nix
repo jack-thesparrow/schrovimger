@@ -79,12 +79,14 @@
             };
 
           apps =
-            (pkgs.lib.mapAttrs (_name: drv: {
+            (pkgs.lib.mapAttrs (name: drv: {
+              meta.description = "SchroVimger Neovim NVF Flake";
               type = "app";
               program = "${drv}/bin/nvim";
             }) neovims)
             // {
               default = {
+                meta.description = "SchroVimger Neovim NVF Flake";
                 type = "app";
                 program = "${neovims.minimal}/bin/nvim";
               };
