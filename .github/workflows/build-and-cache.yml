@@ -1,5 +1,8 @@
-# 🚀 Build & Cache: Runs on push to main, builds every profile for every
-# supported system on its native runner, and pushes closures to Cachix.
+# 🚀 Build & Cache: Runs on push to main, builds profiles for supported
+# systems and pushes closures to Cachix. Linux legs run inside a
+# Nix-preinstalled container (no installer step); macOS still needs the
+# Determinate Systems installer since GitHub Actions containers aren't
+# supported on macOS runners.
 
 name: 🚀 Build & Cache
 
@@ -12,27 +15,72 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NIX_CONFIG: "experimental-features = nix-command flakes"
+
 jobs:
   build-and-cache:
     name: 📦 ${{ matrix.profile }} (${{ matrix.system }})
     runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container || null }}
     strategy:
       fail-fast: false
       matrix:
-        profile: [minimal, cpp, rust, python, java, full]
         include:
-          - system: x86_64-linux
+          # x86_64-linux: every profile, in a Nix-preinstalled container.
+          - profile: minimal
+            system: x86_64-linux
             runner: ubuntu-latest
-          - system: aarch64-linux
+            container: nixos/nix:latest
+          - profile: cpp
+            system: x86_64-linux
+            runner: ubuntu-latest
+            container: nixos/nix:latest
+          - profile: rust
+            system: x86_64-linux
+            runner: ubuntu-latest
+            container: nixos/nix:latest
+          - profile: python
+            system: x86_64-linux
+            runner: ubuntu-latest
+            container: nixos/nix:latest
+          - profile: java
+            system: x86_64-linux
+            runner: ubuntu-latest
+            container: nixos/nix:latest
+          - profile: full
+            system: x86_64-linux
+            runner: ubuntu-latest
+            container: nixos/nix:latest
+
+          # aarch64-linux: smoke-test with minimal + full only.
+          - profile: minimal
+            system: aarch64-linux
             runner: ubuntu-24.04-arm
-          - system: aarch64-darwin
+            container: nixos/nix:latest
+          - profile: full
+            system: aarch64-linux
+            runner: ubuntu-24.04-arm
+            container: nixos/nix:latest
+
+          # aarch64-darwin: smoke-test with minimal + full only.
+          # No container support on macOS runners, so container is empty
+          # and the Determinate Systems installer step below runs instead.
+          - profile: minimal
+            system: aarch64-darwin
             runner: macos-latest
+            container: ""
+          - profile: full
+            system: aarch64-darwin
+            runner: macos-latest
+            container: ""
 
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v5
 
-      - name: 🧊 Install Nix
+      - name: 🧊 Install Nix (macOS only — Linux legs already have it via container)
+        if: matrix.container == ''
         uses: DeterminateSystems/nix-installer-action@main
         with:
           extra-conf: |
@@ -54,6 +102,7 @@ jobs:
   flake-check-all-systems:
     name: 🔍 Full flake check (all systems)
     runs-on: ubuntu-latest
+    container: nixos/nix:latest
     needs: build-and-cache
     steps:
       - name: 📥 Checkout repository
