@@ -4,9 +4,11 @@
       lualine = {
         enable = true;
         theme = "dracula";
-        disabledFiletypes = [
-          "alpha"
-        ];
+        disabledFiletypes = {
+          statusline = [
+            "alpha"
+          ];
+        };
       };
     };
   };
