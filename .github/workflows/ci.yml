@@ -1,4 +1,3 @@
-
 # 🧪 CI: Runs checks & build for every pull request
 
 name: 🧪 CI
@@ -6,19 +5,18 @@ name: 🧪 CI
 on:
   pull_request:
 
-jobs:
-  flake-ci:
-    name: ✅ Flake CI
-    runs-on: ubuntu-latest
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  static-checks:
+    name: ✅ Format / deadnix / statix
+    runs-on: ubuntu-latest
     steps:
-      # 1️⃣ Checkout code
       - name: 📥 Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # 2️⃣ Install Nix + enable flakes
       - name: 🧊 Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -26,26 +24,66 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      # 3️⃣ Setup Cachix for pull-request cache
       - name: 📦 Setup Cachix
         uses: cachix/cachix-action@v14
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # 4️⃣ Verify no uncommitted changes (flake.lock, formatting)
-      - name: 📁 Verify no uncommitted changes
+      - name: 🔍 Run static checks (current system only)
         run: |
-          git diff --exit-code
+          nix build \
+            .#checks.x86_64-linux.format-check \
+            .#checks.x86_64-linux.deadnix \
+            .#checks.x86_64-linux.statix \
+            --no-link --print-out-paths
 
-      # 5️⃣ Run flake checks (format-check, statix, deadnix)
-      - name: 🔍 Run flake checks
-        run: nix flake check --all-systems --no-update-lock-file
+  build-profiles:
+    name: 🔨 Build (${{ matrix.profile }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [minimal, cpp, rust, python, java, full]
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
 
-      # 6️⃣ Build the default package
-      - name: 🔨 Build default package
-        run: nix build
+      - name: 🧊 Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-      # 7️⃣ Test dev shell (optional)
+      - name: 📦 Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: schrovimger
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: 🔨 Build ${{ matrix.profile }} (x86_64-linux)
+        run: nix build .#${{ matrix.profile }} --print-out-paths
+
+  devshell:
+    name: 🧑‍💻 Dev shell
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🧊 Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: 📦 Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: schrovimger
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
       - name: 🧑‍💻 Test dev shell
         run: nix develop --command echo "Dev shell works!"

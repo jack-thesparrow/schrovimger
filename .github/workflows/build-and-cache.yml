@@ -1,5 +1,5 @@
-
-# 🚀 Build & Cache: Runs on push to main, builds, and pushes to Cachix
+# 🚀 Build & Cache: Runs on push to main, builds every profile for every
+# supported system on its native runner, and pushes closures to Cachix.
 
 name: 🚀 Build & Cache
 
@@ -8,17 +8,30 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-cache:
-    name: 📦 Build & Push to Cachix
-    runs-on: ubuntu-latest
+    name: 📦 ${{ matrix.profile }} (${{ matrix.system }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [minimal, cpp, rust, python, java, full]
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+          - system: aarch64-darwin
+            runner: macos-latest
 
     steps:
-      # 1️⃣ Checkout code
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Install Nix + enable flakes
       - name: 🧊 Install Nix
         uses: cachix/install-nix-action@v25
         with:
@@ -26,28 +39,39 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      # 3️⃣ Setup Cachix with push permissions
       - name: 📦 Setup Cachix
         uses: cachix/cachix-action@v14
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # 4️⃣ (Optional but safe) Verify repo clean
-      - name: 📁 Verify no uncommitted changes
-        run: |
-          git diff --exit-code
+      - name: 🔨 Build ${{ matrix.profile }} (${{ matrix.system }})
+        run: nix build .#${{ matrix.profile }} --print-out-paths
 
-      # 5️⃣ (Optional but safe) Run flake checks again
-      - name: 🔍 Run flake checks
-        run: nix flake check --all-systems --no-update-lock-file
-
-      # 6️⃣ Build default flake output
-      - name: 🔨 Build default package
-        run: nix build
-
-      # 7️⃣ Push closure to Cachix
       - name: 🚀 Push to Cachix
         run: |
-          echo "Pushing flake output closure to Cachix..."
-          nix path-info --recursive .#default | cachix push schrovimger
+          nix path-info --recursive .#${{ matrix.profile }} | cachix push schrovimger
+
+  flake-check-all-systems:
+    name: 🔍 Full flake check (all systems)
+    runs-on: ubuntu-latest
+    needs: build-and-cache
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🧊 Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: 📦 Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: schrovimger
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: 🔍 Run flake checks (all systems)
+        run: nix flake check --all-systems --no-update-lock-file
