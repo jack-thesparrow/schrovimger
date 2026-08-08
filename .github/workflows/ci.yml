@@ -22,10 +22,10 @@ jobs:
       full: ${{ steps.filter.outputs.full }}
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 🔎 Filter changed paths
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 🧊 Install Nix
         uses: cachix/install-nix-action@v25
@@ -78,7 +78,7 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -101,7 +101,7 @@ jobs:
         profile: [minimal, cpp, rust, python, java, full]
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 🧊 Install Nix
         if: needs.changes.outputs[matrix.profile] == 'true'
@@ -113,7 +113,7 @@ jobs:
 
       - name: 📦 Setup Cachix
         if: needs.changes.outputs[matrix.profile] == 'true'
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 🧊 Install Nix
         uses: cachix/install-nix-action@v25
@@ -141,7 +141,7 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
