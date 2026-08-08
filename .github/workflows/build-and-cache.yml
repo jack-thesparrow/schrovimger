@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: 📥 Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 🧊 Install Nix
         uses: DeterminateSystems/nix-installer-action@main
@@ -39,7 +39,7 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -57,17 +57,16 @@ jobs:
     needs: build-and-cache
     steps:
       - name: 📥 Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 🧊 Install Nix
-        uses: cachix/install-nix-action@v25
+        uses: DeterminateSystems/nix-installer-action@main
         with:
-          nix_path: nixpkgs=channel:nixpkgs-unstable
-          extra_nix_config: |
+          extra-conf: |
             experimental-features = nix-command flakes
 
       - name: 📦 Setup Cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v16
         with:
           name: schrovimger
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
