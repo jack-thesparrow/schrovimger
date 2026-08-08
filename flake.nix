@@ -41,23 +41,54 @@
             config.allowUnfree = true;
           };
 
-          nvimConfig = nvf.lib.neovimConfiguration {
-            inherit pkgs;
-            modules = [ ./config ];
+          profiles = {
+            minimal = ./config/profiles/minimal.nix;
+            cpp = ./config/profiles/cpp.nix;
+            rust = ./config/profiles/rust.nix;
+            python = ./config/profiles/python.nix;
+            java = ./config/profiles/java.nix;
+            full = ./config/profiles/full.nix;
           };
+          neovims = pkgs.lib.mapAttrs (
+            _name: profileModule:
+            (nvf.lib.neovimConfiguration {
+              inherit pkgs;
+              modules = [ profileModule ];
+            }).neovim
+          ) profiles;
+          wrapProfile =
+            name: drv:
+            pkgs.runCommand "nvim-${name}-wrapped" { } ''
+              mkdir -p $out/bin
+              ln -s ${drv}/bin/nvim $out/bin/nvim-${name}
+            '';
+
+          wrappedPackages = pkgs.lib.mapAttrs' (
+            name: drv: pkgs.lib.nameValuePair "nvim-${name}" (wrapProfile name drv)
+          ) (pkgs.lib.filterAttrs (name: _: name != "minimal") neovims);
+
         in
         {
           _module.args.pkgs = pkgs;
 
-          packages.default = nvimConfig.neovim;
-
-          apps.default = {
-            type = "app";
-            program = "${nvimConfig.neovim}/bin/nvim";
-            meta = {
-              description = "Launch jack-thesparrow NVF config";
+          packages =
+            neovims
+            // wrappedPackages
+            // {
+              default = neovims.minimal;
             };
-          };
+
+          apps =
+            (pkgs.lib.mapAttrs (_name: drv: {
+              type = "app";
+              program = "${drv}/bin/nvim";
+            }) neovims)
+            // {
+              default = {
+                type = "app";
+                program = "${neovims.minimal}/bin/nvim";
+              };
+            };
 
           checks = {
             ## ✅ 1) Format check
@@ -138,7 +169,36 @@
 
       flake = {
         homeModules.default =
-          { pkgs, ... }:
+          { pkgs, lib, ... }:
+          let
+            profiles = {
+              minimal = ./config/profiles/minimal.nix;
+              cpp = ./config/profiles/cpp.nix;
+              rust = ./config/profiles/rust.nix;
+              python = ./config/profiles/python.nix;
+              java = ./config/profiles/java.nix;
+              full = ./config/profiles/full.nix;
+            };
+            neovims = lib.mapAttrs (
+              _name: profileModule:
+              (nvf.lib.neovimConfiguration {
+                inherit pkgs;
+                modules = [ profileModule ];
+              }).neovim
+            ) profiles;
+
+            wrapProfile =
+              name: drv:
+              pkgs.runCommand "nvim-${name}-wrapped" { } ''
+                mkdir -p $out/bin
+                ln -s ${drv}/bin/nvim $out/bin/nvim-${name}
+              '';
+
+            wrapped = lib.mapAttrsToList (name: drv: wrapProfile name drv) (
+              lib.filterAttrs (name: _: name != "minimal") neovims
+            );
+
+          in
           {
             home.packages = [
               pkgs.chafa
@@ -155,11 +215,10 @@
               pkgs.nerd-fonts.jetbrains-mono
               pkgs.ripgrep
 
-              (nvf.lib.neovimConfiguration {
-                inherit pkgs;
-                modules = [ ./config ];
-              }).neovim
-            ];
+              neovims.minimal
+
+            ]
+            ++ wrapped;
           };
       };
     };
