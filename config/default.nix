@@ -1,11 +1,6 @@
 { ... }:
 {
   imports = [
-    #./assistant
-    ./core
-    ./plugins
-    ./themes
-    ./ui
-    ./utility
+    ./profiles/minimal.nix
   ];
 }

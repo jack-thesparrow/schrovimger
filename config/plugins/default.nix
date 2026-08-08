@@ -9,7 +9,8 @@
     ./floaterm.nix
     ./git.nix
     ./hardtime.nix
-    ./languages.nix
+    #./languages.nix
+    ../languages/_base.nix
     ./lsp.nix
     ./lualine.nix
     ./luasnip.nix
